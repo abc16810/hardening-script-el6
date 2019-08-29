@@ -1,0 +1,138 @@
+---
+- name: Auditd Config
+  hosts: audit
+  gather_facts: yes
+  user: root
+  vars:
+    - ssh_keysign_path: /usr/libexec/openssh
+  vars_files:
+    - default_vars.yml
+  tasks:
+     - name: 验证auditd.conf是否存在
+       stat:
+         path: /etc/audit/auditd.conf
+       register: auditd_conf
+       tags:
+         - always
+
+     - name: 验证audisk -remote.conf是否存在 
+       stat:
+         path: /etc/audisp/audisp-remote.conf
+       register: audisp_remote_conf
+       tags:
+         - always
+     
+     - name: 验证au -remote.conf是否存在 
+       stat:
+         path: /etc/audisp/plugins.d/au-remote.conf 
+       register: au_remote_conf
+       tags:
+         - always
+
+     - name: V-72083 - 操作系统必须将审计记录到与被审计系统不同的系统或媒体上 
+       lineinfile:
+         dest: /etc/audisp/audisp-remote.conf
+         regexp: "^(#)?remote_server"
+         line: "remote_server = {{ security_audisp_remote_server }}"
+       when:
+         - security_audisp_remote_server is defined
+         - audisp_remote_conf.stat.exists
+         - au_remote_conf.stat.exists
+       notify:
+         - restart auditd
+       tags:
+         - medium
+         - auditd
+
+     - name: V-72085 - 操作系统必须加密已到与被审计系统不同的系统或媒体上的审计记录的传输 
+       lineinfile:
+         dest: /etc/audisp/audisp-remote.conf
+         regexp: "^(#)?enable_krb5"
+         line: "enable_krb5 = yes"
+       when:
+         - security_audisp_enable_krb5 is defined
+         - audisp_remote_conf.stat.exists
+         - au_remote_conf.stat.exists
+       notify:
+         - restart auditd
+       tags:
+         - medium
+         - auditd
+
+     - name: 激活远程传输 
+       lineinfile:
+         dest: /etc/audisp/plugins.d/au-remote.conf 
+         regexp: "^(#)?active"
+         line: "active = yes"
+       when:
+         - audisp_remote_conf.stat.exists
+         - au_remote_conf.stat.exists
+       notify:
+         - restart auditd
+       tags:
+         - medium
+         - auditd
+
+     - name: 为审计规则获取有效的系统架构 
+       set_fact:
+         auditd_architectures: "{{ (ansible_architecture == 'ppc64le') | ternary(['ppc64'], ['b32', 'b64']) }}"
+       tags:
+         - always
+
+     - name: 删除系统默认audit.rules文件 
+       file:
+         path: /etc/audit/rules.d/audit.rules
+         state: absent
+       when:
+         - auditd_conf.stat.exists
+       notify:
+         - generate auditd rules
+       tags:
+         - always
+
+     - name: 删除旧的RHEL 6审计规则文件 
+       file:
+         path: /etc/audit/rules.d/osas-auditd.rules
+         state: absent
+       when:
+         - auditd_conf.stat.exists
+       notify:
+         - generate auditd rules
+       tags:
+         - always
+
+     - name: 根据STIG需求部署auditd规则 
+       template:
+         src: osas-auditd-rhel7.j2
+         dest: /etc/audit/rules.d/osas-auditd-rhel7.rules
+       when:
+         - auditd_conf.stat.exists
+       notify:
+         - generate auditd rules
+
+
+     - name: 调整auditd / audispd配置 
+       lineinfile:
+         dest: "{{ item.config }}"
+         regexp: '^#?{{ item.parameter }}\s*='
+         line: "{{ item.parameter }} = {{ item.value }}"
+       with_items: "{{ auditd_config }}"
+       when:
+         - auditd_conf.stat.exists
+         - audisp_remote_conf.stat.exists
+         - au_remote_conf.stat.exists
+       notify:
+         - restart auditd
+       tags:
+         - high
+         - auditd
+               
+  handlers:
+     - name: restart auditd
+       command: service auditd restart
+       args:
+          warn: no
+
+     - name: generate auditd rules
+       command: augenrules --load
+       notify: restart auditd

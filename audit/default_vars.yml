@@ -1,0 +1,289 @@
+---
+
+## “audispd”服务将审计日志传输到其他服务器。部署人员
+## 应该指定另一个可以接收审计日志的服务器的地址
+# V-72083
+security_audisp_remote_server: '192.168.100.90'
+#
+
+
+
+## 默认情况下，' ' audispd ' '守护进程在没有加密的情况下传输审计日志。的
+## STIG要求在通过网络传输这些日志时对它们进行加密。加密由' /etc/audisp/ audisk -remote.conf ' '中的' enable_krb5 ' '选项控制。
+# V-72085
+#security_audisp_enable_krb5: yes  
+#
+#
+## 大多数操作系统默认将故障标志设置为' ' 1 ' '，这将最大化系统可用性，同时仍然会发出警报。安全角色中的任务默认将标志设置为' ' 1 ' '
+## 除非系统的安全性优先于可用性，否则强烈建议将故障标志设置为“2”。任何审计失败都会导致内核恐慌，系统需要硬重启
+# V-72081
+security_rhel7_audit_failure_flag: 1
+
+
+# 为命令/系统调用添加审计规则。
+security_rhel7_audit_chsh: yes                               # V-72167
+security_rhel7_audit_chage: yes                              # V-72155
+security_rhel7_audit_chcon: yes                              # V-72139
+security_rhel7_audit_chmod: no                               # V-72105
+security_rhel7_audit_chown: no                               # V-72097
+security_rhel7_audit_creat: yes                              # V-72123
+security_rhel7_audit_crontab: yes                            # V-72183
+security_rhel7_audit_delete_module: yes                      # V-72189
+security_rhel7_audit_fchmod: no                              # V-72107
+security_rhel7_audit_fchmodat: no                            # V-72109
+security_rhel7_audit_fchown: no                              # V-72099
+security_rhel7_audit_fchownat: no                            # V-72103
+security_rhel7_audit_fremovexattr: no                        # V-72119
+security_rhel7_audit_fsetxattr: no                           # V-72113
+security_rhel7_audit_ftruncate: yes                          # V-72133
+security_rhel7_audit_init_module: yes                        # V-72187
+security_rhel7_audit_gpasswd: yes                            # V-72153
+security_rhel7_audit_lchown: no                              # V-72101
+security_rhel7_audit_lremovexattr: no                        # V-72121
+security_rhel7_audit_lsetxattr: no                           # V-72115
+security_rhel7_audit_mount: yes                              # V-72171
+security_rhel7_audit_newgrp: yes                             # V-72165
+security_rhel7_audit_open: yes                               # V-72125
+security_rhel7_audit_openat: yes                             # V-72127
+security_rhel7_audit_open_by_handle_at: yes                  # V-72129
+security_rhel7_audit_pam_timestamp_check: yes                # V-72185
+security_rhel7_audit_passwd: yes                             # V-72149
+security_rhel7_audit_postdrop: yes                           # V-72175
+security_rhel7_audit_postqueue: yes                          # V-72177
+security_rhel7_audit_removexattr: no                         # V-72117
+security_rhel7_audit_rename: yes                             # V-72199
+security_rhel7_audit_renameat: yes                           # V-72201
+security_rhel7_audit_restorecon: yes                         # V-72141
+security_rhel7_audit_rmdir: yes                              # V-72203
+security_rhel7_audit_semanage: yes                           # V-72135
+security_rhel7_audit_setsebool: yes                          # V-72137
+security_rhel7_audit_setxattr: no                            # V-72111
+security_rhel7_audit_ssh_keysign: yes                        # V-72179
+security_rhel7_audit_su: yes                                 # V-72159
+security_rhel7_audit_sudo: yes                               # V-72161
+security_rhel7_audit_sudoedit: yes                           # V-72169
+security_rhel7_audit_truncate: yes                           # V-72131
+security_rhel7_audit_umount: yes                             # V-72173
+security_rhel7_audit_unix_chkpwd: yes                        # V-72151
+security_rhel7_audit_unlink: yes                             # V-72205
+security_rhel7_audit_unlinkat: yes                           # V-72207
+security_rhel7_audit_userhelper: yes                         # V-72157
+# Add audit rules for other events.
+# 包含/var/log/tallylog  二进制日志，记录认证失败情况，与pam认证登陆有关
+#     /var/run/faillock  每个用户的尝试失败次数 用命令faillock 查看
+#     /var/log/lastlog  记录所有用户的最近信息。这不是一个ASCII文件，因此需要用lastlog命令查看内容
+security_rhel7_audit_account_access: yes                     # V-72143
+
+## 记录 修改sudoer 文件夹/etc/sudoers.d/  文件/etc/sudoers
+security_rhel7_audit_sudo_config_changes: yes                # V-72163
+
+## 模块载入命令/sbin/insmod
+security_rhel7_audit_insmod: yes                             # V-72191
+
+## 模块删除命令/sbin/rmmod
+security_rhel7_audit_rmmod: yes                              # V-72193
+
+## /sbin/modprobe  
+security_rhel7_audit_modprobe: yes                           # V-72195
+
+### 账户动作相关事件
+# /etc/group
+# /etc/passwd
+# /etc/gshadow
+# /etc/shadow
+# /etc/security/opasswd
+security_rhel7_audit_account_actions: yes                    # V-72197
+
+
+#   command: the command/syscall to audit (required)
+#   #   stig_id: 来自STIG的编号/ID(必填) 
+#   #   arch_specific: 如果规则依赖于架构类型，则“yes” 否则 no (必填) 
+#   #                  otherwise 'no' (required)
+#   #   path: 命令的路径 (optional, default is '/usr/bin')
+audited_commands:
+  - command: chsh
+    stig_id: V-72167
+    arch_specific: no
+  - command: chage
+    stig_id: V-72155
+    arch_specific: no
+  - command: chcon
+    stig_id: V-72139
+    arch_specific: no
+  - command: chmod
+    stig_id: V-72105
+    arch_specific: yes
+  - command: chown
+    stig_id: V-72097
+    arch_specific: yes
+  - command: creat
+    stig_id: V-72123
+    arch_specific: yes
+  - command: crontab
+    stig_id: V-72183
+    arch_specific: no
+  - command: delete_module
+    stig_id: V-72189
+    arch_specific: yes
+  - command: fchmod
+    stig_id: V-72107
+    arch_specific: yes
+  - command: fchmodat
+    stig_id: V-72109
+    arch_specific: yes
+  - command: fchown
+    stig_id: V-72099
+    arch_specific: yes
+  - command: fchownat
+    stig_id: V-72103
+    arch_specific: yes
+  - command: fremovexattr
+    stig_id: V-72119
+    arch_specific: yes
+  - command: fsetxattr
+    stig_id: V-72113
+    arch_specific: yes
+  - command: ftruncate
+    stig_id: V-72133
+    arch_specific: yes
+  - command: init_module
+    stig_id: V-72187
+    arch_specific: yes
+  - command: gpasswd
+    stig_id: V-72153
+    arch_specific: no
+  - command: lchown
+    stig_id: V-72101
+    arch_specific: yes
+  - command: lremovexattr
+    stig_id: V-72121
+    arch_specific: yes
+  - command: lsetxattr
+    stig_id: V-72115
+    arch_specific: yes
+  - command: mount
+    path: /bin
+    stig_id: V-72171
+    arch_specific: no
+  - command: newgrp
+    stig_id: V-72165
+    arch_specific: no
+  - command: open
+    stig_id: V-72125
+    arch_specific: yes
+  - command: openat
+    stig_id: V-72127
+    arch_specific: yes
+  - command: open_by_handle_at
+    stig_id: V-72129
+    arch_specific: yes
+  - command: pam_timestamp_check
+    path: /sbin
+    stig_id: V-72185
+    arch_specific: no
+  - command: passwd
+    stig_id: V-72149
+    arch_specific: no
+  - command: postdrop
+    path: /usr/sbin
+    stig_id: V-72175
+    arch_specific: no
+  - command: postqueue
+    path: /usr/sbin
+    stig_id: V-72177
+    arch_specific: no
+  - command: removexattr
+    stig_id: V-72117
+    arch_specific: yes
+  - command: rename
+    stig_id: V-72199
+    arch_specific: yes
+  - command: renameat
+    stig_id: V-72201
+    arch_specific: yes
+  - command: restorecon
+    path: /usr/sbin
+    stig_id: V-72141
+    arch_specific: no
+  - command: rmdir
+    stig_id: V-72203
+    arch_specific: yes
+  - command: semanage
+    path: /usr/sbin
+    stig_id: V-72135
+    arch_specific: no
+  - command: setsebool
+    path: /usr/sbin
+    stig_id: V-72137
+    arch_specific: no
+  - command: setxattr
+    stig_id: V-72111
+    arch_specific: yes
+  - command: ssh-keysign
+    path: "{{ ssh_keysign_path }}"
+    stig_id: V-72179
+    arch_specific: no
+  - command: su
+    path: /bin
+    stig_id: V-72159
+    arch_specific: no
+  - command: sudo
+    stig_id: V-72161
+    arch_specific: no
+  - command: sudoedit
+    path: /bin
+    stig_id: V-72169
+    arch_specific: no
+  - command: truncate
+    stig_id: V-72131
+    arch_specific: yes
+  - command: umount
+    path: /bin
+    stig_id: V-72173
+    arch_specific: no
+  - command: unix_chkpwd
+    path: /sbin
+    stig_id: V-72151
+    arch_specific: no
+  - command: unlink
+    stig_id: V-72205
+    arch_specific: yes
+  - command: unlinkat
+    stig_id: V-72207
+    arch_specific: yes
+  - command: userhelper
+    path: /usr/sbin
+    stig_id: V-72157
+    arch_specific: no
+
+## 当远程日志服务器上的磁盘已满或网络中断时本地系统向syslog发送警告 
+## 这样设置最大化本地系统的可用性
+security_rhel7_auditd_disk_full_action: syslog
+security_rhel7_auditd_network_failure_action: syslog
+
+# 触发警报的剩余磁盘空间大小(以MB为单位)。
+# 配置设置为所安装磁盘大小的25%
+# # V-72089
+security_rhel7_auditd_space_left: "{{ (ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_total') | first * 0.25 / 1024 / 1024) | int }}"
+
+# 当达到space_left阈值时要采取的操作 此配置将导致根用户接收电子邮件
+security_rhel7_auditd_space_left_action: email               # V-72091
+security_rhel7_auditd_action_mail_acct: root                 # V-72093
+
+## auditd 配置
+auditd_config:
+  - parameter: disk_full_action
+    value: "{{ security_rhel7_auditd_disk_full_action }}"
+    config: /etc/audisp/audisp-remote.conf
+  - parameter: network_failure_action
+    value: "{{ security_rhel7_auditd_network_failure_action }}"
+    config: /etc/audisp/audisp-remote.conf
+  - parameter: space_left
+    value: "{{ security_rhel7_auditd_space_left }}"
+    config: /etc/audit/auditd.conf
+  - parameter: space_left_action
+    value: "{{ security_rhel7_auditd_space_left_action }}"
+    config: /etc/audit/auditd.conf
+  - parameter: action_mail_acct
+    value: "{{ security_rhel7_auditd_action_mail_acct }}"
+    config: /etc/audit/auditd.conf
