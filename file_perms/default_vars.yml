@@ -1,0 +1,42 @@
+---
+
+# V-71849
+# STIG要求已安装包所拥有的所有文件的权限、用户所有权和组所有权必须设置为供应商默认值
+# 虽然这是一个很好的实践，但是如果在安装包之后有意地设置了权限或所有权，则可能会导致问题。它还会导致部署方面的重大延迟。
+# 因此，默认情况下不应用这个STIG。
+# 重置通过RPM包安装的文件的权限和所有权
+security_reset_perm_ownership: no
+
+
+# 在系统中查找``.shosts`` or  ``shosts.equiv`` 文件. 如果发现 删除它们
+## 在磁盘速度较慢或文件数量较多的系统上，搜索这些文件将花费很长时间。因此，defaul跳过了这个任务
+#V-72277
+security_rhel7_remove_shosts_files: no
+
+# 使用“find”搜索整个文件系统会降低系统性能，并可能对某些应用程序产生负面影响。
+# 因此，默认情况下**禁用搜索具有无效所有者的文件和目录**。
+# V-72007
+security_search_for_invalid_owner: no
+# 搜索具有无效组所有者的文件和目录
+security_search_for_invalid_group_owner: no
+
+#在每个主目录上设置用户/组所有者，并将模式设置为0750
+#权限最大设置为' ' 0750 ' '。如果权限已经比' ' 0750 ' ' '更严格，则保持权限不变
+#尽管STIG要求所有主目录都具有正确的所有者、组所有者和权限，但是这些更改在某些环境中可能会造成破坏。
+#默认情况下不执行这些任务
+security_set_home_directory_permissions_and_owners: no       # V-72017 / V-72019 / V-72021
+
+
+
+
+# 安全角色中的任务检查系统上的可写目录，并报告“根”用户不属于组的任何目录
+# 未经授权的组所有权可能允许某些用户修改来自其他用户的文件。
+# 在整个文件系统中搜索可写目录将消耗大量磁盘I/O，并可能影响生产系统的性能。它还可以延迟剧本的完成。
+# 因此，默认情况下禁用搜索
+# V-72047
+security_find_world_writable_dirs: no
+
+
+# V-72053
+# 安全角色中的任务检查' ' /etc/cron.allow是否存在。并将用户和组的所有权设置为' ' root ' '。
+# 这是Ubuntu、CentOS、Red Hat Enterprise Linux系统、openSUSE Leap和SUSE Linux Enterprise 12上的默认设置。
