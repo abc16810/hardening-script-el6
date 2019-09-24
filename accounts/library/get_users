@@ -1,0 +1,111 @@
+#coding: utf-8
+#!/usr/bin/env python
+
+DOCUMENTATION = """
+---
+module: get_users
+short_description:
+    - A module for gathering facts about Linux users.
+description:
+    - This module gathers facts about the Linux users and groups that exist
+      on the system.
+"""
+
+EXAMPLES = '''
+- get_users:
+    min_uid: 1000
+    max_uid: 2000
+'''
+
+RETURN = '''
+users:
+    description: users matching arguments provided
+    returned: success
+    type: list
+'''
+
+from ansible.module_utils.basic import AnsibleModule
+import grp
+import pwd
+import spwd
+
+def make_user_dict(user_record):
+    user_dict = {
+        'name': user_record.pw_name,
+        'uid': user_record.pw_uid,
+        'gid': user_record.pw_gid,
+        'gecos': user_record.pw_gecos,
+        'dir': user_record.pw_dir,
+        'shell': user_record.pw_shell,
+        'group': make_group_dict(user_record.pw_gid),
+        'shadow': make_shadow_dict(user_record.pw_name)
+    }
+    return user_dict
+
+def make_group_dict(gid):
+    try:
+        group_record = grp.getgrgid(gid)
+    except KeyError:
+        return False
+
+    group_dict = {
+        'name': group_record.gr_name,
+        'passwd': group_record.gr_passwd,
+        'gid': group_record.gr_gid,
+    }
+    return group_dict
+
+
+def make_shadow_dict(username):
+    """创建一个用户shadow密码数据库属性字典"""
+    try:
+        shadow_record = spwd.getspnam(username)
+    except KeyError:
+        return False
+
+    shadow_dict = {
+        'last_changed': shadow_record.sp_lstchg,
+        'min_days': shadow_record.sp_min,
+        'max_days': shadow_record.sp_max,
+        'warn_days': shadow_record.sp_warn,
+        'inact_days': shadow_record.sp_inact,
+        'expire_days': shadow_record.sp_expire,
+    }
+    return shadow_dict
+
+
+def run_module():
+    # 定义用户可以传递给模块的可用参数
+    module_args = dict(
+        min_uid=dict(type='int', default=0),
+        max_uid=dict(type='int', default=65535)
+    )
+
+    module = AnsibleModule(
+      argument_spec = module_args,
+      supports_check_mode=True
+
+    )
+    # 将系统上的所有用户放入dicts列表中。'pwd'模块以结构返回它们。
+    all_users = [make_user_dict(x) for x in pwd.getpwall()]
+
+    # 获取符合我们标准的用户
+    user_list = [x for x in all_users
+                 if (x['uid'] >= module.params['min_uid'] and
+                     x['uid'] <= module.params['max_uid'])]
+    
+    # change是指该模块是否有效地修改了目标
+    # 状态将包含您希望模块返回的任何数据
+    result = dict(
+        changed=False,
+        users=user_list
+    )
+    
+    module.exit_json(**result)
+
+
+def main():
+    run_module()
+
+if __name__ == '__main__':
+    main()

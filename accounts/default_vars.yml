@@ -1,0 +1,132 @@
+---
+
+# 注意:security_pwquality_apply_rules变量是一个"主开关" 
+# 将'security_pwquality_apply_rules'变量设置为'yes'，以应用所有密码质量规则。
+# 每个规则都可以用“no”值禁用。
+security_pwquality_apply_rules: no
+security_pwquality_require_uppercase: yes                    # V-71903
+security_pwquality_require_lowercase: yes                    # V-71905
+security_pwquality_require_numeric: yes                      # V-71907
+security_pwquality_require_special: yes                      # V-71909
+security_pwquality_require_characters_changed: yes           # V-71911
+security_pwquality_require_character_classes_changed: yes    # V-71913
+security_pwquality_limit_repeated_characters: yes            # V-71915
+security_pwquality_limit_repeated_character_classes: yes     # V-71917
+security_pwquality_require_minimum_password_length: no       # V-71935
+
+
+password_quality_rhel7:
+  - parameter: ucredit
+    value: -1
+    stig_id: V-71903
+    description: "密码必须包含至少一个大写字母 (其中 value=-1表示，至少有一个)"
+    enabled: "{{ security_pwquality_require_uppercase }}"
+  - parameter: lcredit
+    value: -1
+    stig_id: V-71905
+    description: "密码必须包含至少一个小写字符"
+    enabled: "{{ security_pwquality_require_lowercase }}"
+  - parameter: dcredit
+    value: -1
+    stig_id: V-71907
+    description: "密码必须包含至少一个数字字符"
+    enabled: "{{ security_pwquality_require_numeric }}"
+  - parameter: ocredit
+    value: -1
+    stig_id: V-71909
+    description: "密码必须包含至少一个特殊字符"
+    enabled: "{{ security_pwquality_require_special }}"
+  - parameter: difok
+    value: 8
+    stig_id: V-71911
+    description: "密码必须至少更改了8个字符(定义新密码中必须有几个字符要与旧密码不同)"
+    enabled: "{{ security_pwquality_require_characters_changed }}"
+  - parameter: minclass
+    value: 4
+    stig_id: V-71913
+    description: "密码必须至少更改了四个字符类"
+    enabled: "{{ security_pwquality_require_character_classes_changed }}"
+  - parameter: maxrepeat
+    value: 3
+    stig_id: V-71915
+    description: "密码连续重复最多三个字符"
+    enabled: "{{ security_pwquality_limit_repeated_characters }}"
+  - parameter: maxclassrepeat
+    value: 4
+    stig_id: V-71917
+    description: "密码在同一字符类中最多连续重复四个字符"
+    enabled: "{{ security_pwquality_limit_repeated_character_classes }}"
+  - parameter: minlen
+    value: 15
+    stig_id: V-71935
+    description: "密码长度必须至少为15个字符"
+    enabled: "{{ security_pwquality_require_minimum_password_length }}"
+
+# redhat (debian or suse :/etc/pam.d/common-password)
+pam_password_file: /etc/pam.d/password-auth
+
+# 确保用户/组管理实用程序只存储加密的密码
+security_libuser_crypt_style_sha512: yes                     # V-71923
+
+
+# 将交互式帐户的最低密码生存期设置为1天。 
+# 为交互式用户帐户设置最小密码生存期限制密码更改的频率可以提高安全性。
+# 但是，如果没有适当的沟通和协调，这可能会给用户带来登录问题。(root用户直接修改用户密码不受影响)
+security_set_minimum_password_lifetime: no                   # V-71927
+security_set_maximum_password_lifetime: no                   # V-71931
+
+
+# 要记住多少老用户密码才能防止密码重复使用 
+# security_password_remember_password: 5                      # V-71933
+
+
+# 如果密码过期，禁用用户帐户
+security_disable_account_if_password_expires: no             # V-71941
+
+
+
+# 确保使用SHA512存储密码 (默认值)
+security_password_encrypt_method: SHA512                     # V-71921
+# 设置用户密码的最小/最大生存期限制
+# #security_password_min_lifetime_days: 1                      # V-71925
+# #security_password_max_lifetime_days: 60                     # V-71929
+# 设置失败登录尝试之间的延迟(以秒为单位) 
+security_shadow_utils_fail_delay: 4                          # V-71951
+# 为所有经过身份验证的用户设置一个umask。 
+# # security_shadow_utils_umask: '077'                         # V-71995
+# 默认情况下为新用户创建主目录 
+security_shadow_utils_create_home: 'yes'                       # V-72013
+
+
+shadow_utils_rhel7:
+  - parameter: ENCRYPT_METHOD
+    value: "{{ security_password_encrypt_method | default('') }}"
+    stig_id: V-71921
+    ansible_os_family: all
+  - parameter: PASS_MIN_DAYS
+    value: "{{ security_password_min_lifetime_days | default('') }}"
+    stig_id: V-71925
+    ansible_os_family: all
+  - parameter: PASS_MAX_DAYS
+    value: "{{ security_password_max_lifetime_days | default('') }}"
+    stig_id: V-71929
+    ansible_os_family: all
+  - parameter: FAIL_DELAY
+    value: "{{ security_shadow_utils_fail_delay | default('') }}"
+    stig_id: V-71951
+    ansible_os_family: RedHat
+  - parameter: UMASK
+    value: "{{ security_shadow_utils_umask | default('') }}"
+    stig_id: V-71995
+    ansible_os_family: all
+  - parameter: CREATE_HOME
+    value: "{{ security_shadow_utils_create_home | default('') }}"
+    stig_id: V-72013
+    ansible_os_family: all
+
+
+# 更改或建立密码时使用pwquality
+security_enable_pwquality_password_set: no                   # V-73159
+
+# Other configuration
+security_interactive_user_minimum_uid: 1000

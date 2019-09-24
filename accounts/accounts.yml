@@ -1,0 +1,263 @@
+---
+- name: 应用账号规则
+  hosts: accounts
+  gather_facts: yes
+  user: root
+  vars:
+  vars_files:
+    - default_vars.yml
+  tasks:
+
+    - name: 检查文件 /etc/security/pwquality.conf 是否存在
+      stat:
+        path: /etc/security/pwquality.conf
+      register: pwquality_config_check
+      tags:
+        - always
+
+    - name: 设置密码复杂度要求 
+      blockinfile:
+        dest: /etc/security/pwquality.conf
+        backup: yes
+        insertbefore: EOF
+        marker: "# {mark} Added by ansible-hardening role"
+        state: present
+        block: "{{ lookup('template', 'pwquality.conf.j2') }}"
+      when:
+        - pwquality_config_check.stat.exists
+      tags:
+        - accounts
+        - medium
+        - V-71903
+        - V-71905
+        - V-71907
+        - V-71909
+        - V-71911
+        - V-71913
+        - V-71915
+        - V-71917
+        - V-71935
+
+    - name: 检查PAM中的SHA512密码存储 
+      command: "grep pam_unix.so {{ pam_password_file }}"
+      register: password_sha512_check
+      changed_when: False
+      check_mode: no
+      tags:
+        - always
+            
+
+    - name: 如果PAM没有使用SHA512作为密码存储，打印警告 
+      debug:
+        msg: >
+          PAM没有使用SHA512作为密码存储。这是一个安全问题 
+      when:
+        - password_sha512_check is defined
+        - "'sha512' not in password_sha512_check.stdout"
+      tags:
+        - accounts
+        - medium
+        - V-71919
+
+    - name: 确保libuser使用SHA512存储密码(这是CentOS 7和Red Hat Enterprise的默认值) 
+      ini_file:
+        dest: /etc/libuser.conf
+        section: defaults
+        option: crypt_style
+        value: sha512
+        backup: yes
+      when:
+        - security_libuser_crypt_style_sha512 | bool
+        - ansible_os_family | lower == 'redhat'
+      tags:
+        - accounts
+        - medium
+        - V-71923
+
+    - name: 获取系统上所有交互用户的用户数据 
+      get_users:
+        min_uid: "{{ security_interactive_user_minimum_uid }}"
+      register: interactive_user_list
+      check_mode: no
+      tags:
+        - always
+
+    - name: 获取系统上所有用户的用户数据 
+      get_users:
+        min_uid: 0
+      register: user_list
+      check_mode: no
+      tags:
+        - always
+
+    - debug:
+        var: interactive_user_list
+        
+    # NOTE(mhayden): The "is mapping" check is required below because some users
+    # may be attached to a Kerberos realm and they may not have shadow data on the
+    # system. See bug 1659232 for more details.
+    - name: 将交互式帐户的最低密码生存期限制设置为24小时 
+      shell: "chage -m 1 {{ item.name }}"
+      when:
+        - item.shadow is mapping
+        - item.shadow.min_days != 1
+        - security_set_minimum_password_lifetime | bool
+      with_items:
+        - "{{ interactive_user_list.users }}"
+      tags:
+        - accounts
+        - medium
+        - V-71927
+
+    # NOTE(mhayden): The "is mapping" check is required below because some users
+    # may be attached to a Kerberos realm and they may not have shadow data on the
+    # system. See bug 1659232 for more details.
+    - name: 将交互式帐户的最大密码生存期限制设置为60天 
+      shell: "chage -M 60 {{ item.name }}"
+      when:
+        - item.shadow is mapping
+        - item.shadow.max_days > 60
+        - security_set_maximum_password_lifetime | bool
+      with_items:
+        - "{{ interactive_user_list.users }}"
+      tags:
+        - accounts
+        - medium
+        - V-71931
+
+    - name: 确保用户不能重复使用前5个密码中的一个 
+      lineinfile:
+        dest: "{{ pam_password_file }}"
+        regexp: '^(password\s+[a-z0-9\=\[\] ]+\s+pam_unix\.so.+?)\s+(?:remember=\d+)?$'
+        line: '\1 remember={{ security_password_remember_password }}'
+        backrefs: yes
+        state: present
+      when:
+        - security_password_remember_password is defined
+      tags:
+        - accounts
+        - medium
+        - V-71933
+    
+    - name: 确保帐户在密码过期时被禁用 
+      lineinfile:
+        dest: /etc/default/useradd
+        regexp: '^[#\s]*INACTIVE'
+        line: 'INACTIVE=0'
+      when:
+        - security_disable_account_if_password_expires | bool
+      tags:
+        - accounts
+        - medium
+        - V-71941
+
+    - name: 应用shadow-utils配置 
+      lineinfile:
+        dest: /etc/login.defs
+        regexp: "^{{ item.parameter }}"
+        line: "{{ item.parameter }} {{ item.value }}"
+        state: present
+      when:
+        - item.value != ''
+        - item.ansible_os_family == 'all' or item.ansible_os_family == ansible_os_family
+      with_items: "{{ shadow_utils_rhel7 }}"
+      tags:
+        - accounts
+        - medium
+        - V-71921
+        - V-71925
+        - V-71929
+        - V-71951
+        - V-71995
+        - V-72013
+    
+    - name: 对于/etc/passwd中不属于/etc/group的组，打印警告 
+      debug:
+        msg: >
+          以下用户在/etc/passwd中拥有/etc/group中不存在的gid 
+          {{ user_list.users | selectattr('group', 'equalto', False) | map(attribute='name') | join(', ') }}
+      when:
+        - user_list is defined
+        - user_list.users | selectattr('group', 'equalto', False) | list | length > 0
+      tags:
+        - accounts
+        - low
+        - V-72003
+
+    - name: 获取所有UID为0的帐户 
+      shell: "awk -F: '$3 == 0 {print $1}' /etc/passwd"
+      changed_when: False
+      check_mode: no
+      register: root_user_check
+      tags:
+        - accounts
+        - high
+        - V-72005
+        - skip_ansible_lint
+
+    - name: 为UID为0的非根用户打印警告 
+      fail:
+        msg: |
+          只有 "root" 用户的UID应该为0。找到了其他用户
+          {{ root_user_check.stdout_lines | join(', ') }}"
+      when:
+        - root_user_check.stdout != 'root'
+      tags:
+        - accounts
+        - high
+        - V-72005
+
+    - name: 没有指定主目录的本地交互式用户的打印警告 
+      debug:
+        msg: |
+          以下用户没有分配主目录
+          {{ user_list.users | selectattr('dir', 'equalto', '') | map(attribute='name') | join(', ') }}
+      when:
+        - user_list is defined
+        - user_list.users | selectattr('dir', 'equalto', '') | map(attribute='name') | list | length > 0
+      tags:
+        - accounts
+        - medium
+        - V-72011
+
+    - name: 检查每个用户，看看它的主目录是否存在于文件系统上 
+      stat:
+        path: "{{ item['dir'] }}"
+      when:
+        - item['dir'] != ''
+      with_items: "{{ user_list.users }}"
+      register: home_directory_checks
+      tags:
+        - accounts
+        - medium
+        - V-72015
+    - debug:
+        var: home_directory_checks
+
+    - name: 为不存在指定的主目录的用户打印警告 
+      debug:
+        msg: |
+          这些用户分配了一个主目录，但该目录并不存在
+          {% for check in home_directory_checks.results %}
+          {% if not check.stat.exists %}
+          {{ check.item.name }} ({{ check.item.dir }} does not exist)
+          {% endif %}
+          {% endfor %}
+      when:
+        - home_directory_checks.results | selectattr('stat.exists', 'sameas', false) | list | length > 0
+      tags:
+        - accounts
+        - medium
+        - V-72015
+
+    - name: 更改或创建密码时使用pwquality 
+      lineinfile:
+        dest: /etc/pam.d/passwd
+        line: "password required pam_pwquality.so retry=3"
+        state: present
+      when:
+        - security_enable_pwquality_password_set | bool
+      tags:
+        - accounts
+        - medium
+        - V-73159
